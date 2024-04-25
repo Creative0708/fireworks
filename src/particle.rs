@@ -11,6 +11,8 @@ pub struct Particle {
     starting_radius: f32,
     density: f32,
 
+    background_color_set_radius: f32,
+
     decay: f32,
 
     color: Color,
@@ -26,6 +28,7 @@ impl Particle {
         vel: Vec2,
         radius: f32,
         density: f32,
+        background_color_set_radius: f32,
         decay: f32,
         color: Color,
         gradient: &'static [u8],
@@ -37,6 +40,8 @@ impl Particle {
             radius,
             starting_radius: radius,
             density,
+
+            background_color_set_radius,
 
             decay,
 
@@ -77,6 +82,7 @@ impl Particle {
         self.force_this_frame += force;
     }
 
+    // boilerplate...
     pub fn pos(&self) -> Vec2 {
         self.pos
     }
@@ -92,6 +98,9 @@ impl Particle {
     pub fn color(&self) -> Color {
         self.color
     }
+    pub fn gradient(&self) -> &'static [u8] {
+        self.gradient
+    }
 
     pub fn render_with_colors(
         &self,
@@ -99,17 +108,23 @@ impl Particle {
         bg_override: Option<Color>,
         fg_override: Option<Color>,
     ) {
-        renderer.set_if_in_bounds(
+        let is_highlighted = self.background_color_set_radius != 0.0
+            && self.radius > self.background_color_set_radius;
+        let bg = bg_override.or(is_highlighted.then(|| crate::util::darken_color(self.color)));
+        let fg = fg_override.unwrap_or_else(|| {
+            if is_highlighted {
+                Color::White
+            } else if self.radius > self.decay {
+                self.color
+            } else {
+                crate::util::darken_color(self.color)
+            }
+        });
+        renderer.add_if_in_bounds(
             self.pos,
             crate::renderer::Cell {
-                bg: bg_override.unwrap_or(Color::Black),
-                fg: fg_override.unwrap_or_else(|| {
-                    if self.radius > self.decay {
-                        self.color
-                    } else {
-                        crate::util::darken_color(self.color)
-                    }
-                }),
+                bg,
+                fg,
                 ch: {
                     self.gradient[((self.radius / self.starting_radius * 8.0) as usize)
                         .clamp(0, self.gradient.len() - 1)] as char

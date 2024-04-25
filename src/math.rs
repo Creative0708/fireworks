@@ -22,6 +22,14 @@ impl Vec2 {
     pub fn normalize(self) -> Self {
         self / self.mag()
     }
+
+    pub fn map<F>(self, f: F) -> Self
+    where
+        F: FnOnce((f32, f32)) -> (f32, f32),
+    {
+        let val = f((self.x, self.y));
+        Self { x: val.0, y: val.1 }
+    }
 }
 
 impl ops::Add<Vec2> for Vec2 {
@@ -48,6 +56,15 @@ impl ops::Mul<f32> for Vec2 {
         Self {
             x: self.x * rhs,
             y: self.y * rhs,
+        }
+    }
+}
+impl ops::Mul<Vec2> for Vec2 {
+    type Output = Self;
+    fn mul(self, rhs: Vec2) -> Self::Output {
+        Self {
+            x: self.x * rhs.x,
+            y: self.y * rhs.y,
         }
     }
 }

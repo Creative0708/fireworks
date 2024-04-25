@@ -6,13 +6,13 @@ use crate::math::Vec2;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Cell {
-    pub bg: Color,
+    pub bg: Option<Color>,
     pub fg: Color,
     pub ch: char,
 }
 impl Cell {
     pub const EMPTY: Self = Self {
-        bg: Color::Black,
+        bg: None,
         fg: Color::White,
         ch: ' ',
     };
@@ -82,7 +82,9 @@ impl Renderer {
             for x in 0..self.width {
                 let index = (x * self.height + y) as usize;
                 self.cell_buf[index] = Cell {
-                    bg: crate::util::desaturate_color(self.saturated_buf[index].bg),
+                    bg: self.saturated_buf[index]
+                        .bg
+                        .map(crate::util::desaturate_color),
                     fg: crate::util::desaturate_color(self.saturated_buf[index].fg),
                     ch: self.saturated_buf[index].ch,
                 };
@@ -128,12 +130,21 @@ impl Renderer {
                     continue;
                 }
                 if last_modified_pos != (x.wrapping_sub(1), y) {
-                    queue!(self.stdout, cursor::MoveTo(x as _, y as _))?;
+                    if last_modified_pos.1 == y {
+                        queue!(self.stdout, cursor::MoveRight(x - last_modified_pos.0 - 1))?;
+                    } else {
+                        queue!(self.stdout, cursor::MoveTo(x as _, y as _))?;
+                    }
                 }
                 let cell = &self.cell_buf[index];
                 queue!(
                     self.stdout,
-                    style::PrintStyledContent(cell.ch.stylize().with(cell.fg).on(cell.bg))
+                    style::PrintStyledContent(
+                        cell.ch
+                            .stylize()
+                            .with(cell.fg)
+                            .on(cell.bg.unwrap_or(Color::Reset))
+                    )
                 )?;
 
                 last_modified_pos = (x, y);
@@ -148,12 +159,14 @@ impl Renderer {
         self.cell_buf.fill(Cell::EMPTY);
     }
 
-    pub fn set_if_in_bounds(&mut self, pos: Vec2, cell: Cell) {
+    pub fn add_if_in_bounds(&mut self, pos: Vec2, cell: Cell) {
         let Vec2 { x, y } = pos;
         if x < 0.0 || x >= self.width as f32 || y < 0.0 || y >= self.height as f32 {
             return;
         }
-        self.cell_buf[x as usize * self.height as usize + y as usize] = cell;
+        let index = x as usize * self.height as usize + y as usize;
+        let target_cell = &mut self.cell_buf[index];
+        *target_cell = cell;
     }
 
     pub fn width(&self) -> u16 {

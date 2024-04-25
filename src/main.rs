@@ -69,36 +69,95 @@ fn main() -> Result<(), Box<dyn Error>> {
             renderer.render(&world);
         }
 
-        if rand::thread_rng().gen_ratio(1, frame_rate) {
+        if rand::thread_rng().gen_ratio(2, frame_rate) {
+            use crossterm::style::Color;
+
+            #[derive(Clone, Copy)]
+            enum FireworkType {
+                Standard,
+                Streamer,
+            }
+
+            let firework_type = util::choice(&[FireworkType::Standard, FireworkType::Streamer]);
+
+            let firework_color = util::choice(&[
+                Color::Red,
+                Color::Green,
+                Color::Yellow,
+                Color::Blue,
+                Color::Magenta,
+                Color::Cyan,
+                Color::White,
+                Color::Grey,
+            ]);
+            let firework_explosion_fac = util::rand_range(0.5, 2.0);
+            let firework_speed_fac = util::rand_range(0.5, 1.0)
+                * (renderer.height() as f32 * 0.03)
+                * (firework_explosion_fac * 0.2 + 1.0);
+
             world.add_firework(firework::Firework::new(
                 particle::Particle::new(
                     Vec2::new(
                         util::rand_range(-2.0, (renderer.width() + 2) as f32),
                         renderer.height() as f32 + 3.0,
                     ),
-                    Vec2::new(
-                        util::fuzzy(0.0, 20.0),
-                        util::rand_range(-1.4, -0.7) * renderer.height() as f32,
-                    ),
+                    Vec2::new(util::fuzzy(0.0, 20.0), firework_speed_fac * -3.0),
                     3.0,
                     0.05,
+                    match firework_type {
+                        FireworkType::Standard => 0.01,
+                        FireworkType::Streamer => 0.0,
+                    },
                     0.0,
-                    crossterm::style::Color::White,
-                    b"#",
+                    firework_color,
+                    b":#",
                 ),
-                util::rand_range(1.0, 3.0),
-                firework::FireworkType::Standard {
-                    num_particles: 40,
-                    radius: 50.0,
-                    particle_radius: 0.3,
-                    particle_lifespan: 2.0,
+                firework_speed_fac * 1.3,
+                util::fuzzy(1.5, 0.5),
+                match firework_type {
+                    FireworkType::Standard => firework::FireworkType::Standard {
+                        num_particles: (40.0 * firework_explosion_fac * firework_explosion_fac)
+                            as _,
+                        radius: 40.0 * firework_explosion_fac,
+                        particle_radius: 0.3,
+                        particle_lifespan: 2.0,
+                        particle_gradient: util::choice(&[b".,:;*&@", br#"'"~*^&#"#, b"`-=!%$"]),
+                    },
+                    FireworkType::Streamer => firework::FireworkType::None,
                 },
-                firework::TrailType::Basic {
-                    lifetime: 2.0,
-                    spread: 15.0,
-                    color: crossterm::style::Color::DarkGrey,
+                match firework_type {
+                    FireworkType::Standard => firework::TrailType::Basic {
+                        lifetime: 2.0 * firework_explosion_fac,
+                        spread: 15.0 * firework_explosion_fac,
+                        color: util::darken_color(firework_color),
+                        gradient: util::choice(&[b".-.-*+*+", b"<^>v<^>v", b"/-\\|/-\\|"]),
+
+                        particle_frequency: 60.0,
+
+                        background_color_set_fac: 0.0,
+
+                        propulsion_force: 160.0,
+
+                        wobble_force: util::rand_range(0.0, 100.0),
+                        wobble_frequency: util::fuzzy(30.0, 10.0),
+                    },
+                    FireworkType::Streamer => firework::TrailType::Basic {
+                        lifetime: 2.0 * firework_explosion_fac,
+                        spread: 15.0 * firework_explosion_fac,
+                        color: firework_color,
+                        gradient: util::choice(&[b".-.-*+*+", b"<^>v<^>v", b"/-\\|/-\\|"]),
+
+                        particle_frequency: util::rand_range(60.0, 180.0),
+
+                        background_color_set_fac: 0.85,
+
+                        propulsion_force: 160.0,
+
+                        wobble_force: util::rand_range(100.0, 400.0),
+                        wobble_frequency: util::fuzzy(30.0, 10.0),
+                    },
                 },
-                vec![crossterm::style::Color::White],
+                vec![firework_color],
             ));
         }
 
