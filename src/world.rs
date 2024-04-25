@@ -27,7 +27,7 @@ impl World {
                 fireworks_to_remove.push(id)
             }
         }
-        self.fireworks = fireworks;
+        self.fireworks.extend(fireworks);
 
         for id in particles_to_remove {
             self.particles.remove(&id);

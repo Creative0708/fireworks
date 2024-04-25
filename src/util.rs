@@ -5,6 +5,9 @@ use crate::math::Vec2;
 
 /// Returns a random value between `-val` and `val`.
 pub fn fuzzy(center: f32, val: f32) -> f32 {
+    if val <= 0.0 {
+        return center;
+    }
     rand::thread_rng().gen_range(center - val..center + val)
 }
 pub fn fuzzy_circle(outer: f32) -> Vec2 {
@@ -21,8 +24,15 @@ pub fn choice<T: Clone>(choices: &[T]) -> T {
     use rand::seq::SliceRandom;
     choices.choose(&mut rand::thread_rng()).unwrap().clone()
 }
+pub fn probability(prob: f32) -> bool {
+    rand::thread_rng().gen_bool(prob as f64)
+}
 pub fn rand_range(min: f32, max: f32) -> f32 {
-    rand::thread_rng().gen_range(min..=max)
+    let range = min..=max;
+    if range.is_empty() {
+        return min;
+    }
+    rand::thread_rng().gen_range(range)
 }
 
 pub fn darken_color(color: Color) -> Color {
@@ -42,14 +52,14 @@ pub fn darken_color(color: Color) -> Color {
 // used for "pause" menu
 pub fn desaturate_color(color: Color) -> Color {
     match color {
-        Color::White
-        | Color::Grey
-        | Color::Red
-        | Color::Green
-        | Color::Yellow
-        | Color::Blue
-        | Color::Magenta
-        | Color::Cyan => Color::DarkGrey,
-        _ => Color::Black,
+        Color::Reset | Color::Black => Color::Reset,
+        _ => Color::DarkGrey,
     }
+}
+
+// https://stackoverflow.com/questions/5531827/random-point-on-a-given-sphere
+pub fn rand_on_sphere() -> [f32; 3] {
+    let theta = self::rand_range(0.0, std::f32::consts::TAU);
+    let phi = self::rand_range(-1.0, 1.0).acos();
+    return [phi.sin() * theta.cos(), phi.sin() * theta.sin(), phi.cos()];
 }

@@ -2,24 +2,24 @@ use crossterm::style::Color;
 
 use crate::math::{self, Vec2};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Particle {
-    pos: Vec2,
-    vel: Vec2,
+    pub pos: Vec2,
+    pub vel: Vec2,
 
-    radius: f32,
+    pub radius: f32,
     starting_radius: f32,
-    density: f32,
+    pub density: f32,
 
-    background_color_set_radius: f32,
+    pub background_color_set_radius: f32,
 
-    decay: f32,
+    pub decay: f32,
 
-    color: Color,
+    pub color: Color,
 
     force_this_frame: Vec2,
 
-    gradient: &'static [u8],
+    pub gradient: &'static [u8],
 }
 
 impl Particle {
@@ -38,7 +38,7 @@ impl Particle {
             vel,
 
             radius,
-            starting_radius: radius,
+            starting_radius: crate::util::rand_range(radius, radius * 1.5),
             density,
 
             background_color_set_radius,
@@ -80,26 +80,6 @@ impl Particle {
 
     pub fn apply_continuous_force(&mut self, force: Vec2) {
         self.force_this_frame += force;
-    }
-
-    // boilerplate...
-    pub fn pos(&self) -> Vec2 {
-        self.pos
-    }
-    pub fn vel(&self) -> Vec2 {
-        self.vel
-    }
-    pub fn radius(&self) -> f32 {
-        self.radius
-    }
-    pub fn decay(&self) -> f32 {
-        self.decay
-    }
-    pub fn color(&self) -> Color {
-        self.color
-    }
-    pub fn gradient(&self) -> &'static [u8] {
-        self.gradient
     }
 
     pub fn render_with_colors(

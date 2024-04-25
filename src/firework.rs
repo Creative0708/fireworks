@@ -2,7 +2,7 @@ use crossterm::style::Color;
 
 use crate::{math::Vec2, particle::Particle, util, world};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Firework {
     particle: Particle,
     target_direction: Vec2,
@@ -26,7 +26,7 @@ impl Firework {
         trail_type: TrailType,
         colors: Vec<Color>,
     ) -> Self {
-        let target_direction = (particle.vel() * Vec2::new(0.2, 1.0)).normalize();
+        let target_direction = (particle.vel * Vec2::new(0.2, 1.0)).normalize();
         Self {
             particle,
             target_direction,
@@ -72,7 +72,7 @@ impl Firework {
 
                 for _ in 0..((particle_frequency * delta) as u32) {
                     world.add_particle(Particle::new(
-                        self.particle.pos(),
+                        self.particle.pos,
                         util::fuzzy_circle(0.0) * spread - wobble * 0.3,
                         0.03,
                         0.0001,
@@ -98,26 +98,35 @@ impl Firework {
                     particle_radius,
                     particle_lifespan,
                     particle_gradient,
-                    ..
+
+                    particle_glow_fac,
+                    ref nested_firework,
                 } => {
                     for _ in 0..num_particles {
-                        let particle_vel_fac = util::fuzzy_circle(0.1);
-                        let particle_radius = util::fuzzy(particle_radius, 0.1);
-                        world.add_particle(Particle::new(
-                            self.particle.pos(),
-                            {
-                                let mut val = particle_vel_fac * radius;
-                                // assume a 1:2 ratio for terminal chars
-                                val.x *= 2.0;
-                                val
-                            },
-                            particle_radius,
-                            util::fuzzy(0.03, 0.001),
-                            particle_radius + particle_vel_fac.mag_sqr() - 0.05,
-                            particle_radius / util::fuzzy(particle_lifespan, 0.5),
-                            util::choice(&self.colors),
-                            particle_gradient,
-                        ));
+                        let [x, y, _] = util::rand_on_sphere();
+                        let particle_vel_fac = Vec2::new(x, y) * util::fuzzy(1.0, 0.1);
+                        let particle_vel = particle_vel_fac.map(|(x, y)| (x * 2.0, y)) * radius;
+
+                        if let Some(nested_firework) = nested_firework {
+                            let mut firework = *nested_firework.clone();
+                            firework.particle.pos = self.particle.pos;
+                            firework.particle.vel = particle_vel;
+                            firework.target_direction = Vec2::ZERO;
+                            firework.lifetime *= util::rand_range(0.8, 1.0);
+                            world.add_firework(firework);
+                        } else {
+                            let particle_radius = util::fuzzy(particle_radius, 0.1);
+                            world.add_particle(Particle::new(
+                                self.particle.pos,
+                                particle_vel,
+                                particle_radius,
+                                self.particle.density * util::fuzzy(0.6, 0.02),
+                                particle_radius - util::fuzzy(0.0, particle_glow_fac),
+                                particle_radius / (particle_lifespan * util::fuzzy(1.0, 0.5)),
+                                util::choice(&self.colors),
+                                particle_gradient,
+                            ));
+                        }
                     }
                 }
             }
@@ -128,19 +137,6 @@ impl Firework {
     }
 }
 
-#[derive(Debug)]
-pub enum FireworkType {
-    None,
-    Standard {
-        num_particles: u32,
-        radius: f32,
-        particle_radius: f32,
-        particle_lifespan: f32,
-
-        particle_gradient: &'static [u8],
-    },
-}
-
 impl crate::renderer::Renderable for Firework {
     fn render(&self, renderer: &mut crate::renderer::Renderer) {
         let int_radius = self.render_radius.floor() as i32;
@@ -148,18 +144,18 @@ impl crate::renderer::Renderable for Firework {
             for dy in -int_radius..=int_radius {
                 let ch = {
                     let gradient_index = (self.render_radius - ((dx * dx + dy * dy) as f32).sqrt())
-                        .min(self.particle.gradient().len() as f32 - 1.0);
+                        .min(self.particle.gradient.len() as f32 - 1.0);
                     if gradient_index < 0.0 {
                         continue;
                     }
-                    self.particle.gradient()[gradient_index as usize] as char
+                    self.particle.gradient[gradient_index as usize] as char
                 };
 
                 renderer.add_if_in_bounds(
-                    self.particle.pos() + Vec2::new(dx as _, dy as _),
+                    self.particle.pos + Vec2::new(dx as _, dy as _),
                     crate::renderer::Cell {
                         bg: None,
-                        fg: self.particle.color(),
+                        fg: self.particle.color,
                         ch,
                     },
                 )
@@ -169,7 +165,24 @@ impl crate::renderer::Renderable for Firework {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
+pub enum FireworkType {
+    None,
+    Standard {
+        num_particles: u32,
+        radius: f32,
+        particle_radius: f32,
+        particle_lifespan: f32,
+
+        particle_gradient: &'static [u8],
+
+        particle_glow_fac: f32,
+
+        nested_firework: Option<Box<Firework>>,
+    },
+}
+
+#[derive(Debug, Clone)]
 pub enum TrailType {
     None,
     Basic {
