@@ -1,0 +1,20 @@
+{
+    "vscode-dark": {
+        "black": "#151515",
+        "grey": "#505050",
+        "blue": "#6A9FB5",
+        "cyan": "#75B5AA",
+        "green": "#90A959",
+        "magenta": "#AA759F",
+        "red": "#AC4142",
+        "white": "#F5F5F5",
+        "yellow": "#F4BF75",
+        "darkBlue": "#6A9FB5",
+        "darkCyan": "#75B5AA",
+        "darkGreen": "#90A959",
+        "darkMagenta": "#AA759F",
+        "darkRed": "#AC4142",
+        "darkWhite": "#D0D0D0",
+        "darkYellow": "#F4BF75"
+    }
+}

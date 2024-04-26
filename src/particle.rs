@@ -1,4 +1,4 @@
-use crossterm::style::Color;
+use crate::renderer::Color;
 
 use crate::math::{self, Vec2};
 

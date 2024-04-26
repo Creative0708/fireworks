@@ -1,6 +1,4 @@
-use crossterm::style::Color;
-
-use crate::{math::Vec2, particle::Particle, util, world};
+use crate::{math::Vec2, particle::Particle, renderer::Color, util, world};
 
 #[derive(Debug, Clone)]
 pub struct Firework {
@@ -26,7 +24,7 @@ impl Firework {
         trail_type: TrailType,
         colors: Vec<Color>,
     ) -> Self {
-        let target_direction = (particle.vel * Vec2::new(0.2, 1.0)).normalize();
+        let target_direction = particle.vel.normalize();
         Self {
             particle,
             target_direction,
@@ -44,7 +42,10 @@ impl Firework {
         self.lifetime -= delta;
 
         match self.trail_type {
-            TrailType::None => (),
+            TrailType::None { propulsion_force } => {
+                let vel = self.target_direction * (self.lifetime / self.max_lifetime);
+                self.particle.apply_continuous_force(vel * propulsion_force);
+            }
             TrailType::Basic {
                 propulsion_force,
                 wobble_force,
@@ -56,8 +57,9 @@ impl Firework {
 
                 lifetime,
                 spread,
-                color,
                 gradient,
+
+                ref colors,
             } => {
                 let vel = self.target_direction * (self.lifetime / self.max_lifetime);
                 let wobble = vel.map(|(x, y)| (y, -x))
@@ -82,7 +84,7 @@ impl Firework {
                             background_color_set_fac * 0.03
                         },
                         0.03 / util::rand_range(0.2, lifetime),
-                        color,
+                        util::choice(&colors),
                         gradient,
                     ));
                 }
@@ -105,7 +107,10 @@ impl Firework {
                     for _ in 0..num_particles {
                         let [x, y, _] = util::rand_on_sphere();
                         let particle_vel_fac = Vec2::new(x, y) * util::fuzzy(1.0, 0.1);
-                        let particle_vel = particle_vel_fac.map(|(x, y)| (x * 2.0, y)) * radius;
+                        let particle_vel = particle_vel_fac.map(|(x, y)| {
+                            // assume 1:2.3 aspect ratio for terminal characters
+                            (x * 2.3, y)
+                        }) * radius;
 
                         if let Some(nested_firework) = nested_firework {
                             let mut firework = *nested_firework.clone();
@@ -184,11 +189,12 @@ pub enum FireworkType {
 
 #[derive(Debug, Clone)]
 pub enum TrailType {
-    None,
+    None {
+        propulsion_force: f32,
+    },
     Basic {
         lifetime: f32,
         spread: f32,
-        color: Color,
         gradient: &'static [u8],
 
         particle_frequency: f32,
@@ -198,5 +204,7 @@ pub enum TrailType {
         propulsion_force: f32,
         wobble_force: f32,
         wobble_frequency: f32,
+
+        colors: Vec<Color>,
     },
 }

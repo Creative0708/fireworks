@@ -1,8 +1,56 @@
-use std::io::{self, Write};
-
-use crossterm::{execute, queue, style::Color};
+use std::io;
 
 use crate::math::Vec2;
+
+#[cfg(target_arch = "wasm32")]
+use wasm_bindgen::prelude::*;
+
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
+pub enum Color {
+    Red = 0,
+    DarkRed = 1,
+    Green = 2,
+    DarkGreen = 3,
+    Yellow = 4,
+    DarkYellow = 5,
+    Blue = 6,
+    DarkBlue = 7,
+    Magenta = 8,
+    DarkMagenta = 9,
+    Cyan = 10,
+    DarkCyan = 11,
+    White = 12,
+    Grey = 13,
+    DarkGrey = 14,
+
+    Transparent = 15,
+}
+#[cfg(not(target_arch = "wasm32"))]
+impl From<Color> for crossterm::style::Color {
+    fn from(value: Color) -> Self {
+        match value {
+            Color::Red => Self::Red,
+            Color::DarkRed => Self::DarkRed,
+            Color::Green => Self::Green,
+            Color::DarkGreen => Self::DarkGreen,
+            Color::Yellow => Self::Yellow,
+            Color::DarkYellow => Self::DarkYellow,
+            Color::Blue => Self::Blue,
+            Color::DarkBlue => Self::DarkBlue,
+            Color::Magenta => Self::Magenta,
+            Color::DarkMagenta => Self::DarkMagenta,
+            Color::Cyan => Self::Cyan,
+            Color::DarkCyan => Self::DarkCyan,
+            Color::White => Self::White,
+            Color::Grey => Self::Grey,
+            Color::DarkGrey => Self::DarkGrey,
+
+            Color::Black => Self::Black,
+            Color::Transparent => Self::Reset,
+        }
+    }
+}
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Cell {
@@ -16,6 +64,28 @@ impl Cell {
         fg: Color::White,
         ch: ' ',
     };
+
+    pub fn from_fg(fg: Color) -> Self {
+        Self { fg, ..Self::EMPTY }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    pub fn queue(&self, terminal: &mut Terminal) -> io::Result<()> {
+        use crossterm::{
+            queue,
+            style::{self, Stylize},
+        };
+        queue!(
+            terminal,
+            style::PrintStyledContent(
+                self.ch.stylize().with(self.fg.into()).on(self
+                    .bg
+                    .map(Into::into)
+                    .unwrap_or(crossterm::style::Color::Reset))
+            )
+        )?;
+        Ok(())
+    }
 }
 impl Default for Cell {
     fn default() -> Self {
@@ -23,8 +93,23 @@ impl Default for Cell {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+pub struct CellChange {
+    pub index: u32,
+    pub bg: Color,
+    pub fg: Color,
+    pub char: char,
+}
+
+// Infallible and () don't work here so...
+#[cfg(target_arch = "wasm32")]
+pub type Terminal = u8;
+#[cfg(not(target_arch = "wasm32"))]
+pub type Terminal = io::StdoutLock<'static>;
+
 pub struct Renderer {
-    stdout: Option<io::StdoutLock<'static>>,
+    terminal: Option<Terminal>,
 
     width: u16,
     height: u16,
@@ -37,19 +122,26 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(mut stdout: io::StdoutLock<'static>) -> io::Result<Self> {
-        use crossterm::{cursor, terminal};
-        let term_size = terminal::size()?;
-        terminal::enable_raw_mode()?;
-        execute!(
-            stdout,
-            terminal::EnterAlternateScreen,
-            cursor::MoveTo(0, 0),
-            cursor::Hide
-        )?;
+    pub fn new(terminal: Option<Terminal>) -> io::Result<Self> {
+        #[cfg(not(target_arch = "wasm32"))]
+        use crossterm::{cursor, execute, terminal};
+        #[cfg(not(target_arch = "wasm32"))]
+        let mut terminal = terminal;
 
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            terminal::enable_raw_mode()?;
+            execute!(
+                terminal,
+                terminal::EnterAlternateScreen,
+                cursor::MoveTo(0, 0),
+                cursor::Hide
+            )?;
+        }
+
+        #[cfg_attr(target_arch = "wasm32", allow(unused_mut))]
         let mut s = Self {
-            stdout: Some(stdout),
+            terminal,
 
             width: 0,
             height: 0,
@@ -60,13 +152,17 @@ impl Renderer {
 
             children: Vec::new(),
         };
-        s.resize(term_size.0 as _, term_size.1 as _)?;
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let term_size = terminal::size()?;
+            s.resize(term_size.0 as _, term_size.1 as _)?;
+        }
         Ok(s)
     }
 
     pub fn new_layer(&mut self) -> io::Result<usize> {
         self.children.push(Self {
-            stdout: None,
+            terminal: None,
             width: 0,
             height: 0,
 
@@ -77,10 +173,9 @@ impl Renderer {
 
             children: Vec::new(),
         });
-        self.children
-            .last_mut()
-            .unwrap()
-            .resize(self.width, self.height)?;
+        let layer = self.children.last_mut().unwrap();
+        layer.resize(self.width, self.height)?;
+        layer.clear_buffer();
         Ok(self.children.len() - 1)
     }
     pub fn get_layer(&mut self, index: usize) -> &mut Self {
@@ -106,10 +201,14 @@ impl Renderer {
         self.cell_buf.resize(buf_size, Cell::EMPTY);
         self.old_cell_buf.resize(buf_size, Cell::EMPTY);
 
-        if let Some(ref mut stdout) = self.stdout {
-            use crossterm::style::{self, Stylize};
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(ref mut terminal) = self.terminal {
+            use crossterm::{
+                queue,
+                style::{self, Stylize},
+            };
             queue!(
-                stdout,
+                terminal,
                 style::PrintStyledContent(
                     std::str::from_utf8(&{
                         let mut big_string = Vec::new();
@@ -118,7 +217,7 @@ impl Renderer {
                     })
                     .unwrap_or_else(|_| unreachable!())
                     .stylize()
-                    .on_black()
+                    .on(crossterm::style::Color::Reset)
                 )
             )?;
         }
@@ -132,6 +231,20 @@ impl Renderer {
 
     pub fn render(&mut self, renderable: &impl Renderable) {
         renderable.render(self)
+    }
+
+    pub fn text(&mut self, x: u16, y: u16, text: &str, cell: Cell) {
+        for (x, ch) in (x..).zip(text.chars()) {
+            if x >= self.width {
+                break;
+            }
+            let index = (x as u32 * self.height as u32 + y as u32) as usize;
+            self.cell_buf[index] = Cell {
+                bg: cell.bg,
+                fg: cell.fg,
+                ch,
+            };
+        }
     }
 
     pub fn desaturate(&mut self) {
@@ -160,47 +273,54 @@ impl Renderer {
     }
 
     pub fn flush(&mut self) -> io::Result<()> {
-        let Some(ref mut stdout) = self.stdout else {
-            return Ok(());
-        };
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(ref mut terminal) = self.terminal {
+            let mut last_modified_pos = (u16::MAX, u16::MAX);
+            for y in 0..self.height {
+                for x in 0..self.width {
+                    use crossterm::{cursor, queue};
 
-        let mut last_modified_pos = (u16::MAX, u16::MAX);
+                    let index = (x as u32 * self.height as u32 + y as u32) as usize;
+                    if self.old_cell_buf[index] == self.cell_buf[index] {
+                        continue;
+                    }
+                    if last_modified_pos != (x.wrapping_sub(1), y) {
+                        if last_modified_pos.1 == y {
+                            queue!(terminal, cursor::MoveRight(x - last_modified_pos.0 - 1))?;
+                        } else {
+                            queue!(terminal, cursor::MoveTo(x as _, y as _))?;
+                        }
+                    }
+                    self.cell_buf[index].queue(terminal)?;
+
+                    last_modified_pos = (x, y);
+                }
+            }
+
+            terminal.flush()?;
+        }
+        #[cfg(target_arch = "wasm32")]
+        Ok(())
+    }
+
+    pub fn get_changes(&self) -> Vec<CellChange> {
+        let mut res = Vec::new();
         for y in 0..self.height {
             for x in 0..self.width {
-                use crossterm::{
-                    cursor,
-                    style::{self, Stylize},
-                };
-
                 let index = (x as u32 * self.height as u32 + y as u32) as usize;
                 if self.old_cell_buf[index] == self.cell_buf[index] {
                     continue;
                 }
-                if last_modified_pos != (x.wrapping_sub(1), y) {
-                    if last_modified_pos.1 == y {
-                        queue!(stdout, cursor::MoveRight(x - last_modified_pos.0 - 1))?;
-                    } else {
-                        queue!(stdout, cursor::MoveTo(x as _, y as _))?;
-                    }
-                }
                 let cell = &self.cell_buf[index];
-                queue!(
-                    stdout,
-                    style::PrintStyledContent(
-                        cell.ch
-                            .stylize()
-                            .with(cell.fg)
-                            .on(cell.bg.unwrap_or(Color::Reset))
-                    )
-                )?;
-
-                last_modified_pos = (x, y);
+                res.push(CellChange {
+                    index: index as _,
+                    bg: cell.bg.unwrap_or(Color::Transparent),
+                    fg: cell.fg,
+                    char: cell.ch,
+                });
             }
         }
-
-        stdout.flush()?;
-
-        Ok(())
+        res
     }
 
     pub fn clear_buffer(&mut self) {
@@ -228,13 +348,14 @@ impl Renderer {
 
 impl Drop for Renderer {
     fn drop(&mut self) {
-        if let Some(ref mut stdout) = self.stdout {
-            execute!(
-                stdout,
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(ref mut terminal) = self.terminal {
+            crossterm::execute!(
+                terminal,
                 crossterm::terminal::LeaveAlternateScreen,
                 crossterm::cursor::Show
             )
-            .expect("failed to execute on stdout");
+            .expect("failed to execute on terminal");
             crossterm::terminal::disable_raw_mode().expect("failed to disable raw mode");
         }
     }
