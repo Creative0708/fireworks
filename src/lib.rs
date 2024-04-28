@@ -252,6 +252,8 @@ impl Fireworks {
         self.renderer.stack_layers();
         self.renderer.flush().expect("failed to flush");
     }
+
+    #[cfg(target_arch = "wasm32")]
     pub fn get_renderer_changes(&self) -> Vec<renderer::CellChange> {
         self.renderer.get_changes()
     }
@@ -279,6 +281,7 @@ impl Fireworks {
     }
 }
 
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen(start)]
 fn start() {
     console_error_panic_hook::set_once();

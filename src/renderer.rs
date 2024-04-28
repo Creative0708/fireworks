@@ -46,7 +46,6 @@ impl From<Color> for crossterm::style::Color {
             Color::Grey => Self::Grey,
             Color::DarkGrey => Self::DarkGrey,
 
-            Color::Black => Self::Black,
             Color::Transparent => Self::Reset,
         }
     }
@@ -64,10 +63,6 @@ impl Cell {
         fg: Color::White,
         ch: ' ',
     };
-
-    pub fn from_fg(fg: Color) -> Self {
-        Self { fg, ..Self::EMPTY }
-    }
 
     #[cfg(not(target_arch = "wasm32"))]
     pub fn queue(&self, terminal: &mut Terminal) -> io::Result<()> {
@@ -122,14 +117,12 @@ pub struct Renderer {
 }
 
 impl Renderer {
-    pub fn new(terminal: Option<Terminal>) -> io::Result<Self> {
+    pub fn new(mut terminal: Option<Terminal>) -> io::Result<Self> {
         #[cfg(not(target_arch = "wasm32"))]
         use crossterm::{cursor, execute, terminal};
         #[cfg(not(target_arch = "wasm32"))]
-        let mut terminal = terminal;
-
         #[cfg(not(target_arch = "wasm32"))]
-        {
+        if let Some(ref mut terminal) = terminal {
             terminal::enable_raw_mode()?;
             execute!(
                 terminal,
@@ -297,12 +290,13 @@ impl Renderer {
                 }
             }
 
+            use std::io::Write;
             terminal.flush()?;
         }
-        #[cfg(target_arch = "wasm32")]
         Ok(())
     }
 
+    #[cfg(target_arch = "wasm32")]
     pub fn get_changes(&self) -> Vec<CellChange> {
         let mut res = Vec::new();
         for y in 0..self.height {

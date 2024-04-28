@@ -4,7 +4,7 @@ use std::{error::Error, time};
 fn main() -> Result<(), Box<dyn Error>> {
     use std::io;
 
-    let mut fireworks = fireworks::Fireworks::new(io::stdout().lock())?;
+    let mut fireworks = fireworks::Fireworks::new(Some(io::stdout().lock()));
 
     let mut frame_rate: u32 = 24;
     let mut frame_time = time::Duration::from_nanos(1_000_000_000 / frame_rate as u64);
@@ -21,13 +21,13 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut current_time = time::Duration::ZERO;
 
     'outer: loop {
-        fireworks.update_and_draw(frame_time.as_secs_f32())?;
+        fireworks.update_and_draw(frame_time.as_secs_f32());
 
         use crossterm::event;
         while event::poll(std::time::Duration::ZERO)? {
             match event::read()? {
                 event::Event::Resize(width, height) => {
-                    fireworks.handle_event(fireworks::TerminalEvent::Resize { width, height })?;
+                    fireworks.handle_resize(width, height);
                 }
                 event::Event::Key(e) => {
                     if e.modifiers.contains(event::KeyModifiers::CONTROL)
@@ -42,7 +42,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         event::KeyCode::Char(ch) => Some(ch),
                         _ => None,
                     } {
-                        fireworks.handle_event(fireworks::TerminalEvent::Key(char))?;
+                        fireworks.handle_key(char);
                     }
                 }
                 _ => (),
