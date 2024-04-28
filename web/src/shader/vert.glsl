@@ -29,9 +29,7 @@ void main() {
 
     uint width = dimensions >> 16, height = dimensions & 0xffffu;
     uint x = (coords >> 16) + (cornerIndex & 1u), y = (coords & 0xffffu) + (cornerIndex >> 1);
-    gl_Position = vec4(float(x) / float(width), float(y) / float(height), 0.0f, 1.0f);
-
-    gl_Position = vec4((cornerIndex & 1u), (cornerIndex >> 1), 0.0f, 1.0f);
+    gl_Position = vec4(float(x) / float(width) * 2.0f - 1.0f, 1.0f - float(y) / float(height) * 2.0f, 0.0f, 1.0f);
 
     fragData = vertData >> 8;
     uint charIndex = vertData & 0xffu;

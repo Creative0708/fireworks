@@ -90,12 +90,7 @@ export class TextGl {
 
         this.cornerIndexVBO = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerIndexVBO);
-        gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array([
-            0b00,
-            0b01,
-            0b10,
-            0b11,
-        ]), gl.STATIC_DRAW);
+        gl.bufferData(gl.ARRAY_BUFFER, new Uint8Array([0b11, 0b01, 0b10, 0b00]), gl.STATIC_DRAW);
 
         this.handleResize();
     }
@@ -104,9 +99,11 @@ export class TextGl {
         // rerender buffer
         const ctx = this.textCtx, gl = this.gl;
 
-        ctx.font = "1em 'Consolas', 'Courier New', Courier, monospace";
+        ctx.font = "2em monospace";
         const TEXT_ASPECT_RATIO = 2.0;
-        const textWidth = Math.round(ctx.measureText("a").width), textHeight = textWidth * TEXT_ASPECT_RATIO;
+        const textMetrics = ctx.measureText("a");
+        const textWidth = Math.round(textMetrics.width), textHeight = textWidth * TEXT_ASPECT_RATIO;
+        const textBaseline = textMetrics.fontBoundingBoxDescent
 
         if (textWidth !== this.prevTextWidth || textHeight !== this.prevTextHeight) {
 
@@ -117,37 +114,42 @@ export class TextGl {
             // find optimal power-of-two dimensions
             let finalTextureWidth = Infinity, finalTextureHeight = Infinity;
             for (let testTextureWidth = 4096; testTextureWidth > 8; testTextureWidth >>= 1) {
-                let numColumns = Math.ceil(testTextureWidth / textWidth);
+                let numColumns = Math.floor(testTextureWidth / textWidth);
                 let numRows = Math.ceil(numChars / numColumns);
                 if (numColumns === 0 || numRows === 0)
                     continue;
 
-                let testTextureHeight = 1 << 31 - Math.clz32(numRows * textHeight - 1);
+                // smallest power of 2 greater than numRows * textHeight
+                let testTextureHeight = 1 << 32 - Math.clz32(numRows * textHeight - 1);
                 if (testTextureWidth * testTextureHeight < finalTextureWidth * finalTextureHeight) {
                     finalTextureWidth = testTextureWidth; finalTextureHeight = testTextureHeight;
                 }
             }
 
             this.textCtx.canvas.width = finalTextureWidth; this.textCtx.canvas.height = finalTextureHeight;
-            const numCharColumns = Math.ceil(finalTextureWidth / textWidth);
+            // ctx.font gets reset after changing canvas dimensions
+            // https://stackoverflow.com/questions/3349947/html-5-canvas-font-being-ignored
+            ctx.font = "2em monospace";
+            const numCharColumns = Math.floor(finalTextureWidth / textWidth);
             const numCharRows = Math.ceil(numChars / numCharColumns);
 
             gl.uniform1ui(this.charsPerRowUniform, numCharColumns);
 
             ctx.fillStyle = "#fff";
-            for (let i = 0; i <= MAX_CHAR; i++) {
-                ctx.fillText(String.fromCharCode(32 + i), i % numCharColumns * textWidth, Math.floor(i / numCharColumns) * textHeight);
+            for (let i = 0; i <= numChars; i++) {
+                ctx.fillText(String.fromCharCode(32 + i), i % numCharColumns * textWidth, Math.floor(i / numCharColumns) * textHeight + textHeight - textBaseline);
             }
 
             gl.texImage2D(gl.TEXTURE_2D, 0, gl.R8, finalTextureWidth, finalTextureHeight, 0, gl.RED, gl.UNSIGNED_BYTE, this.textCtx.canvas);
+            gl.uniform2f(this.cellTextureSizeUniform, textWidth / finalTextureWidth, textHeight / finalTextureHeight);
 
             this.prevTextWidth = textWidth; this.prevTextHeight = textHeight;
 
             // resize the main canvas
             const canvas = gl.canvas;
-            const numRows = this.numRows = Math.floor(innerWidth / textWidth);
-            const numColumns = this.numColumns = Math.floor(innerHeight / textHeight);
-            const newCanvasWidth = numRows * textWidth, newCanvasHeight = numColumns * textHeight;
+            const numRows = this.numRows = Math.floor(innerHeight / textHeight);
+            const numColumns = this.numColumns = Math.floor(innerWidth / textWidth);
+            const newCanvasWidth = numColumns * textWidth, newCanvasHeight = numRows * textHeight;
 
             gl.uniform1ui(this.dimensionsUniform, numColumns << 16 | numRows);
 
@@ -159,14 +161,14 @@ export class TextGl {
                     cells[i] = {
                         backgroundIndex: 0,
                         foregroundIndex: 0,
-                        charIndex: 0,
+                        charIndex: (i % numChars) + 32,
                     };
                 }
             }
 
             if (newCanvasWidth !== canvas.width || newCanvasHeight !== canvas.height) {
                 canvas.width = newCanvasWidth; canvas.height = newCanvasHeight;
-                gl.uniform2f(this.cellTextureSizeUniform, textWidth / newCanvasHeight, textHeight / newCanvasHeight);
+                gl.viewport(0, 0, newCanvasWidth, newCanvasHeight);
 
                 this.redrawEverything();
             }
@@ -185,7 +187,7 @@ export class TextGl {
         const { foregroundIndex, backgroundIndex, charIndex } = cell;
 
         this.coordsArrayBuffer[cellIndex] = x << 16 | y;
-        this.vertDataArrayBuffer[cellIndex] = foregroundIndex << 16 | backgroundIndex << 8 | charIndex;
+        this.vertDataArrayBuffer[cellIndex] = foregroundIndex << 16 | backgroundIndex << 8 | charIndex - 32;
 
         this.numCellsToDraw++;
     }
@@ -219,17 +221,10 @@ export class TextGl {
         gl.enableVertexAttribArray(1);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, this.cornerIndexVBO);
-        gl.vertexAttribIPointer(2, 1, gl.UNSIGNED_BYTE, 1, 0);
+        gl.vertexAttribIPointer(2, 1, gl.UNSIGNED_BYTE, 0, 0);
         gl.enableVertexAttribArray(2);
 
-
-        console.log(this.coordsArrayBuffer.slice(0, this.numCellsToDraw));
-        console.log(this.vertDataArrayBuffer.slice(0, this.numCellsToDraw));
-        console.log(this.numCellsToDraw);
-
-
-        // gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 6, this.numCellsToDraw);
-        gl.drawArrays(gl.TRIANGLE_STRIP, 0, 1);
+        gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.numCellsToDraw);
 
         this.numCellsToDraw = 0;
 
