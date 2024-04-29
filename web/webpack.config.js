@@ -7,8 +7,15 @@ const dist = path.resolve(__dirname, "dist");
 
 const isProd = process.env.NODE_ENV === "production";
 
+Object.assign(process.env, {
+    CARGO_PROFILE_RELEASE_LTO: "true",
+    CARGO_PROFILE_RELEASE_OPT_LEVEL: "z",
+    CARGO_PROFILE_RELEASE_PANIC: "abort",
+    CARGO_PROFILE_RELEASE_STRIP: "symbols",
+});
+
 module.exports = {
-    mode: isProd ? "development" : "production",
+    mode: isProd ? "production" : "development",
     entry: {
         index: "./src/index.ts"
     },
@@ -23,7 +30,12 @@ module.exports = {
                 test: /\.glsl$/,
                 use: {
                     loader: "webpack-glsl-minify",
-                    options: isProd ? {} : {
+                    options: isProd ? {
+                        // https://github.com/leosingleton/webpack-glsl-minify/issues/64
+                        nomangle: ["texture"],
+                        // https://github.com/leosingleton/webpack-glsl-minify/issues/62
+                        preserveUniforms: true,
+                    } : {
                         preserveDefines: true,
                         preserveUniforms: true,
                         preserveVariables: true,
@@ -45,9 +57,9 @@ module.exports = {
         static: dist,
     },
     plugins: [
-        // new WasmPackPlugin({
-        //     crateDirectory: path.resolve(__dirname, ".."),
-        // }),
+        new WasmPackPlugin({
+            crateDirectory: path.resolve(__dirname, ".."),
+        }),
         new HtmlWebpackPlugin({
             template: "src/index.html",
             minify: {
@@ -71,7 +83,7 @@ module.exports = {
                 terserOptions: {
                     compress: {
                         drop_debugger: false,
-                    }
+                    },
                 }
             })
         ]

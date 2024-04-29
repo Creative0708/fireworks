@@ -20,7 +20,7 @@ layout(location = 1) in uint vertData;
 // 2 bits indicating which corner of the cell it's in.
 layout(location = 2) in lowp uint cornerIndex;
 
-// combined character index and background and foreground colors.
+// background and foreground colors.
 // 8-bit background color, then an 8-bit foreground color.
 flat out mediump uint fragData;
 out vec2 fragUV;
