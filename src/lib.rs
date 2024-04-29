@@ -254,7 +254,7 @@ impl Fireworks {
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn get_renderer_changes(&self) -> Vec<renderer::CellChange> {
+    pub fn get_renderer_changes(&self) -> Vec<u64> {
         self.renderer.get_changes()
     }
 

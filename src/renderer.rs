@@ -6,30 +6,31 @@ use crate::math::Vec2;
 use wasm_bindgen::prelude::*;
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-#[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 pub enum Color {
-    Red = 0,
-    DarkRed = 1,
-    Green = 2,
-    DarkGreen = 3,
-    Yellow = 4,
-    DarkYellow = 5,
-    Blue = 6,
-    DarkBlue = 7,
-    Magenta = 8,
-    DarkMagenta = 9,
-    Cyan = 10,
-    DarkCyan = 11,
-    White = 12,
+    Black = 0,
+    Red = 1,
+    DarkRed = 2,
+    Green = 3,
+    DarkGreen = 4,
+    Yellow = 5,
+    DarkYellow = 6,
+    Blue = 7,
+    DarkBlue = 8,
+    Magenta = 9,
+    DarkMagenta = 10,
+    Cyan = 11,
+    DarkCyan = 12,
     Grey = 13,
     DarkGrey = 14,
+    White = 15,
 
-    Transparent = 15,
+    Transparent = 16,
 }
 #[cfg(not(target_arch = "wasm32"))]
 impl From<Color> for crossterm::style::Color {
     fn from(value: Color) -> Self {
         match value {
+            Color::Black => Self::Black,
             Color::Red => Self::Red,
             Color::DarkRed => Self::DarkRed,
             Color::Green => Self::Green,
@@ -86,15 +87,6 @@ impl Default for Cell {
     fn default() -> Self {
         Self::EMPTY
     }
-}
-
-#[cfg(target_arch = "wasm32")]
-#[wasm_bindgen]
-pub struct CellChange {
-    pub index: u32,
-    pub bg: Color,
-    pub fg: Color,
-    pub char: char,
 }
 
 // Infallible and () don't work here so...
@@ -297,7 +289,7 @@ impl Renderer {
     }
 
     #[cfg(target_arch = "wasm32")]
-    pub fn get_changes(&self) -> Vec<CellChange> {
+    pub fn get_changes(&self) -> Vec<u64> {
         let mut res = Vec::new();
         for y in 0..self.height {
             for x in 0..self.width {
@@ -306,12 +298,13 @@ impl Renderer {
                     continue;
                 }
                 let cell = &self.cell_buf[index];
-                res.push(CellChange {
-                    index: index as _,
-                    bg: cell.bg.unwrap_or(Color::Transparent),
-                    fg: cell.fg,
-                    char: cell.ch,
-                });
+                res.push(
+                    (index as u64) << 32
+                        | (cell.bg.unwrap_or(Color::Black) as u64) << 16
+                        | (cell.fg as u64) << 8
+                        | (TryInto::<u8>::try_into(cell.ch).expect("can't convert char to byte")
+                            as u64),
+                );
             }
         }
         res

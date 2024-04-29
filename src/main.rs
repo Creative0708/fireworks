@@ -6,8 +6,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let mut fireworks = fireworks::Fireworks::new(Some(io::stdout().lock()));
 
-    let mut frame_rate: u32 = 24;
-    let mut frame_time = time::Duration::from_nanos(1_000_000_000 / frame_rate as u64);
+    const FRAME_RATES: &[u32] = &[1, 3, 5, 10, 15, 30, 60];
+    let mut frame_rate_index = FRAME_RATES.len() - 1;
+
+    let mut frame_time =
+        time::Duration::from_nanos(1_000_000_000 / FRAME_RATES[frame_rate_index] as u64);
     let mut dropped_frame_counter: i32 = 0;
 
     let instant = time::Instant::now();
@@ -57,31 +60,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 
             if dropped_frame_counter > 0 {
                 dropped_frame_counter -= 1;
-            } else if frame_rate < 24 {
-                frame_rate = match frame_rate {
-                    1 => 3,
-                    3 => 5,
-                    5 => 10,
-                    10 => 15,
-                    15 => 24,
-                    _ => unreachable!(),
-                };
-                frame_time = time::Duration::from_nanos(1_000_000_000 / frame_rate as u64);
+            } else if frame_rate_index < FRAME_RATES.len() - 1 {
+                frame_rate_index += 1;
+                frame_time = time::Duration::from_nanos(
+                    1_000_000_000 / FRAME_RATES[frame_rate_index] as u64,
+                );
             }
         } else {
             current_time = elapsed;
 
             dropped_frame_counter += 5;
-            if dropped_frame_counter > 24 {
-                frame_rate = match frame_rate {
-                    24 => 15,
-                    15 => 10,
-                    10 => 5,
-                    5 => 3,
-                    3 => 1,
-                    _ => unreachable!(),
-                };
-                frame_time = time::Duration::from_nanos(1_000_000_000 / frame_rate as u64);
+            if dropped_frame_counter > 30 && frame_rate_index > 0 {
+                frame_rate_index -= 1;
+                frame_time = time::Duration::from_nanos(
+                    1_000_000_000 / FRAME_RATES[frame_rate_index] as u64,
+                );
                 dropped_frame_counter -= 10;
             }
         }
