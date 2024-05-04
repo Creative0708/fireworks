@@ -1,8 +1,5 @@
 use crate::math::Vec2;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::{convert::IntoWasmAbi, prelude::*};
-
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum Color {
     Black = 0,
@@ -83,7 +80,11 @@ impl CellChange {
 }
 
 #[cfg(target_arch = "wasm32")]
-mod wasm {
+mod web {
+    use wasm_bindgen::convert::IntoWasmAbi;
+
+    use super::{CellChange, Color};
+
     // TODO am i doing this right??? there's like no documentation on this anywhere >:(
     impl wasm_bindgen::describe::WasmDescribeVector for CellChange {
         fn describe_vector() {
