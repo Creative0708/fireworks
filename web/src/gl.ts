@@ -118,7 +118,7 @@ export class TextGl {
 
     handleResize() {
         const MAX_CHAR = 127;
-        const FONT_SIZE = 24;
+        const FONT_SIZE = 16;
         const numChars = MAX_CHAR - 32;
 
         // rerender buffer

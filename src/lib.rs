@@ -226,17 +226,17 @@ pub struct Fireworks {
 #[cfg_attr(target_arch = "wasm32", wasm_bindgen)]
 impl Fireworks {
     #[cfg_attr(target_arch = "wasm32", wasm_bindgen(constructor))]
-    pub fn new(terminal: Option<renderer::Terminal>) -> Self {
-        let mut renderer = renderer::Renderer::new(terminal).expect("failed to create renderer");
+    pub fn new(width: u16, height: u16) -> Self {
+        let mut renderer = renderer::Renderer::new(width, height);
         Self {
-            firework_layer: renderer.new_layer().expect("failed to create layer"),
+            firework_layer: renderer.new_layer(),
             renderer,
             world: world::World::new(),
             paused: false,
         }
     }
 
-    pub fn update_and_draw(&mut self, frame_time: f32) {
+    pub fn update_and_render(&mut self, frame_time: f32) {
         if !self.paused {
             self.world.update(frame_time);
             let firework_layer = self.renderer.get_layer(self.firework_layer);
@@ -250,18 +250,14 @@ impl Fireworks {
 
         self.renderer.clear_buffer();
         self.renderer.stack_layers();
-        self.renderer.flush().expect("failed to flush");
     }
 
-    #[cfg(target_arch = "wasm32")]
-    pub fn get_renderer_changes(&self) -> Vec<u64> {
+    pub fn get_renderer_changes(&self) -> Vec<renderer::CellChange> {
         self.renderer.get_changes()
     }
 
     pub fn handle_resize(&mut self, width: u16, height: u16) {
-        self.renderer
-            .resize(width, height)
-            .expect("failed to resize");
+        self.renderer.resize(width, height);
     }
     pub fn handle_key(&mut self, key: char) {
         if key == '\x1b' {

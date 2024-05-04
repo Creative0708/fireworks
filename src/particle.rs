@@ -82,7 +82,7 @@ impl Particle {
         self.force_this_frame += force;
     }
 
-    pub fn render_with_colors(
+    pub fn render_with_overrides(
         &self,
         renderer: &mut crate::renderer::Renderer,
         bg_override: Option<Color>,
@@ -116,6 +116,6 @@ impl Particle {
 
 impl crate::renderer::Renderable for Particle {
     fn render(&self, renderer: &mut crate::renderer::Renderer) {
-        self.render_with_colors(renderer, None, None);
+        self.render_with_overrides(renderer, None, None);
     }
 }

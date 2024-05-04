@@ -10,8 +10,7 @@ canvas.removeAttribute("style");
 const fireworksCanvas = new TextGl(canvas.getContext("webgl2", { preserveDrawingBuffer: true, alpha: false }));
 
 seed_rand(crypto.getRandomValues(new BigUint64Array(1))[0]);
-const fireworks = new Fireworks();
-fireworks.handle_resize(fireworksCanvas.numColumns, fireworksCanvas.numRows);
+const fireworks = new Fireworks(fireworksCanvas.numColumns, fireworksCanvas.numRows);
 
 let resizeTimeout: number | null = null;
 addEventListener("resize", () => {
@@ -37,13 +36,13 @@ function draw(timestamp?: number) {
         delta = (timestamp - lastTime) / 1000;
     lastTime = timestamp;
 
-    fireworks.update_and_draw(delta);
+    fireworks.update_and_render(delta);
     for (const change of fireworks.get_renderer_changes()) {
-        const index = Number(change >> BigInt(32));
+        const coords = Number(change >> BigInt(32));
         const data = Number(change & BigInt(0xffffffff));
         fireworksCanvas.queueCell(
-            Math.floor(index / fireworksCanvas.numRows),
-            index % fireworksCanvas.numRows,
+            coords >> 16,
+            coords & 0xffff,
             {
                 backgroundIndex: data >> 16,
                 foregroundIndex: data >> 8 & 0xff,

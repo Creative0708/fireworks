@@ -144,7 +144,7 @@ impl Firework {
 
 impl crate::renderer::Renderable for Firework {
     fn render(&self, renderer: &mut crate::renderer::Renderer) {
-        let int_radius = self.render_radius.floor() as i32;
+        let int_radius = util::fuzzy(self.render_radius.floor(), 1.0) as i32;
         for dx in -int_radius..=int_radius {
             for dy in -int_radius..=int_radius {
                 let ch = {
