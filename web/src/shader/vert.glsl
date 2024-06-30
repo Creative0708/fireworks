@@ -9,29 +9,27 @@ uniform mediump uint charsPerRow;
 // How big each character is on the atlas.
 uniform vec2 cellTextureSize;
 
-// vertex coordinates; top 16 bits are x, lower 16 bits are y
-layout(location = 0) in uint coords;
-
-// combined character index, background color, and foreground color
-// which indicates what corner of the character this vertex is.
-// 8 bits unused, 8-bit background color, 8-bit foreground color, 8-bit char index
-layout(location = 1) in uint vertData;
+// combined vertex coordinates, character index, background color, and foreground color
+// 32-bit coordinates, 8-bit char index + 24-bit background color, 24-bit foreground color,
+// coordinates: top 16 bits are x, lower 16 bits are y
+// char index is packed into the top 8 bits of the background color
+layout(location = 0) in uvec3 vertData;
 
 // 2 bits indicating which corner of the cell it's in.
-layout(location = 2) in lowp uint cornerIndex;
+layout(location = 1) in lowp uint cornerIndex;
 
 // background and foreground colors.
-// 8-bit background color, then an 8-bit foreground color.
-flat out mediump uint fragData;
+// 24-bit background color, then a 24-bit foreground color.
+flat out uvec2 fragColors;
 out vec2 fragUV;
 
 void main() {
-
     uint width = dimensions >> 16, height = dimensions & 0xffffu;
-    uint x = (coords >> 16) + (cornerIndex & 1u), y = (coords & 0xffffu) + (cornerIndex >> 1);
+    uint x = (vertData.x >> 16) + (cornerIndex & 1u), y = (vertData.x & 0xffffu) + (cornerIndex >> 1);
     gl_Position = vec4(float(x) / float(width) * 2.0f - 1.0f, 1.0f - float(y) / float(height) * 2.0f, 0.0f, 1.0f);
 
-    fragData = vertData >> 8;
-    uint charIndex = vertData & 0xffu;
+    // top 8 bits are ignored anyway so this is fine
+    fragColors = vertData.yz;
+    uint charIndex = vertData.y >> 24;
     fragUV = vec2(charIndex % charsPerRow + (cornerIndex & 1u), charIndex / charsPerRow + (cornerIndex >> 1)) * cellTextureSize;
 }

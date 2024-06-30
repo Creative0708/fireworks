@@ -31,7 +31,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         time::SystemTime::now()
             .duration_since(time::SystemTime::UNIX_EPOCH)
             .unwrap_or(time::Duration::ZERO)
-            .as_secs(),
+            .as_secs()
+            ^ 0x1cf06c55027b810d,
     );
     let mut current_time = time::Duration::ZERO;
 

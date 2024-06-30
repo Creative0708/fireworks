@@ -80,10 +80,7 @@ pub fn darken_color(color: Color) -> Color {
     }
 }
 pub fn darken_colors(colors: &[Color]) -> Vec<Color> {
-    colors
-        .iter()
-        .map(|color| darken_color(color.clone()))
-        .collect()
+    colors.iter().map(|&color| darken_color(color)).collect()
 }
 
 // used for "pause" menu
@@ -98,5 +95,5 @@ pub fn desaturate_color(color: Color) -> Color {
 pub fn rand_on_sphere() -> [f32; 3] {
     let theta = self::rand_range(0.0, std::f32::consts::TAU);
     let phi = self::rand_range(-1.0, 1.0).acos();
-    return [phi.sin() * theta.cos(), phi.sin() * theta.sin(), phi.cos()];
+    [phi.sin() * theta.cos(), phi.sin() * theta.sin(), phi.cos()]
 }

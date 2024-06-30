@@ -7,7 +7,14 @@ const canvas: HTMLCanvasElement = document.getElementById("fireworks") as HTMLCa
 
 canvas.removeAttribute("style");
 
-const fireworksCanvas = new TextGl(canvas.getContext("webgl2", { preserveDrawingBuffer: true, alpha: false }));
+const fireworksCanvas = new TextGl(canvas.getContext("webgl2", {
+    preserveDrawingBuffer: true,
+    alpha: false,
+    antialias: false,
+    depth: false,
+    stencil: false,
+    powerPreference: "low-power",
+}));
 
 seed_rand(crypto.getRandomValues(new BigUint64Array(1))[0]);
 const fireworks = new Fireworks(fireworksCanvas.numColumns, fireworksCanvas.numRows);
@@ -23,7 +30,23 @@ addEventListener("resize", () => {
         fireworks.handle_resize(fireworksCanvas.numColumns, fireworksCanvas.numRows);
     }, 20);
 });
-addEventListener("keypress", console.log);
+addEventListener("keydown", (e) => {
+    if (e.key === "Escape")
+        fireworks.handle_key("\x1b");
+    else if (e.key.length == 1)
+        fireworks.handle_key(e.key);
+});
+
+let colorPalette: Color[] = [];
+
+function getColorFromU32(u32: number): Color | undefined {
+    // world's least useful switch case
+    // TODO add support for other colors (and figure out how ANSI colors are calculated )
+    switch (u32 >> 24) {
+        case 0:
+            return colorPalette[u32];
+    }
+}
 
 applyTheme(themes["vscode-dark"]);
 
@@ -37,16 +60,19 @@ function draw(timestamp?: number) {
     lastTime = timestamp;
 
     fireworks.update_and_render(delta);
-    for (const change of fireworks.get_renderer_changes()) {
-        const coords = Number(change >> BigInt(32));
-        const data = Number(change & BigInt(0xffffffff));
+
+    let raw_data = fireworks.get_renderer_changes();
+    for (let i = 0; i < raw_data.length; i += 4) {
+        const [coords, bgColor, fgColor, char] = raw_data.subarray(i, i + 4);
+
         fireworksCanvas.queueCell(
             coords >> 16,
             coords & 0xffff,
+            // TODO implement non-ANSI colors
             {
-                backgroundIndex: data >> 16,
-                foregroundIndex: data >> 8 & 0xff,
-                charIndex: data & 0xff,
+                background: getColorFromU32(bgColor),
+                foreground: getColorFromU32(fgColor),
+                char,
             }
         );
     }
@@ -55,10 +81,17 @@ function draw(timestamp?: number) {
     requestAnimationFrame(draw);
 }
 
+function redrawEverything() {
+    // TODO 
+    // fireworksCanvas.cells.forEach((cell) => {
+    //     cell.
+    // });
+}
+
+fireworksCanvas.init();
+fireworks.handle_resize(fireworksCanvas.numColumns, fireworksCanvas.numRows);
 requestAnimationFrame(draw);
 // setInterval(draw, 1000 / 3);
-
-
 
 function applyTheme(theme: Theme) {
     const colorOrder = [
@@ -80,12 +113,12 @@ function applyTheme(theme: Theme) {
         "white",
     ] as const;
 
-    const colors: Color[] = [];
-    for (const color of colorOrder) {
+    colorOrder.forEach((color, i) => {
         const hex = parseInt(theme[color].substring(1), 16)
-        colors.push([hex >> 16, hex >> 8 & 0xff, hex & 0xff]);
-    }
+        colorPalette[i] = hex;
+    });
 
-    fireworksCanvas.setTheme(colors);
-    fireworksCanvas.redrawEverything();
+    fireworksCanvas.backgroundColor = colorPalette[0];
+
+    redrawEverything();
 }

@@ -41,10 +41,12 @@ impl Firework {
         self.particle.update(delta);
         self.lifetime -= delta;
 
+        let propulsion_fac = self.target_direction * (self.lifetime / self.max_lifetime);
+
         match self.trail_type {
             TrailType::None { propulsion_force } => {
-                let vel = self.target_direction * (self.lifetime / self.max_lifetime);
-                self.particle.apply_continuous_force(vel * propulsion_force);
+                self.particle
+                    .apply_continuous_force(propulsion_fac * propulsion_force);
             }
             TrailType::Basic {
                 propulsion_force,
@@ -69,7 +71,8 @@ impl Firework {
                         * 0.5)
                         * wobble_force);
 
-                self.particle.apply_continuous_force(vel * propulsion_force);
+                self.particle
+                    .apply_continuous_force(propulsion_fac * propulsion_force);
                 self.particle.apply_continuous_force(wobble);
 
                 for _ in 0..((particle_frequency * delta) as u32) {
@@ -84,7 +87,7 @@ impl Firework {
                             background_color_set_fac * 0.03
                         },
                         0.03 / util::rand_range(0.2, lifetime),
-                        util::choice(&colors),
+                        util::choice(colors),
                         gradient,
                     ));
                 }
@@ -112,26 +115,17 @@ impl Firework {
                             (x * 2.3, y)
                         }) * radius;
 
-                        if let Some(nested_firework) = nested_firework {
-                            let mut firework = *nested_firework.clone();
-                            firework.particle.pos = self.particle.pos;
-                            firework.particle.vel = particle_vel;
-                            firework.target_direction = Vec2::ZERO;
-                            firework.lifetime *= util::rand_range(0.8, 1.0);
-                            world.add_firework(firework);
-                        } else {
-                            let particle_radius = util::fuzzy(particle_radius, 0.1);
-                            world.add_particle(Particle::new(
-                                self.particle.pos,
-                                particle_vel,
-                                particle_radius,
-                                self.particle.density * util::fuzzy(0.6, 0.02),
-                                particle_radius - util::fuzzy(0.0, particle_glow_fac),
-                                particle_radius / (particle_lifespan * util::fuzzy(1.0, 0.5)),
-                                util::choice(&self.colors),
-                                particle_gradient,
-                            ));
-                        }
+                        let particle_radius = util::fuzzy(particle_radius, 0.1);
+                        world.add_particle(Particle::new(
+                            self.particle.pos,
+                            particle_vel,
+                            particle_radius,
+                            self.particle.density * util::fuzzy(0.6, 0.02),
+                            particle_radius - util::fuzzy(0.0, particle_glow_fac),
+                            particle_radius / (particle_lifespan * util::fuzzy(1.0, 0.5)),
+                            util::choice(&self.colors),
+                            particle_gradient,
+                        ));
                     }
                 }
             }

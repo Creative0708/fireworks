@@ -1,6 +1,6 @@
 {
   "author": "Colin Cai <therealcreative0708@gmail.com>",
-  "name": "xtermjs-fireworks",
+  "name": "fireworks",
   "scripts": {
     "build": "webpack",
     "start": "webpack-dev-server --open"
