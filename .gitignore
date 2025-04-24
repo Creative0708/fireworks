@@ -1,0 +1,7 @@
+# build files
+/target
+/pkg
+
+# project-related files that shouldn't be tracked
+/tmp
+/web
